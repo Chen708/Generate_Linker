@@ -380,6 +380,7 @@ class linker_length():
     def __init__(self):
         self.src_new = remove_dummys(self.src)
         self.goal_length = self.w
+        print(self.goal_length)
 
 
     def __call__(self, smile):

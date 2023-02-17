@@ -317,7 +317,6 @@ def calSIM_3D(smi, ref):
 def calSA(smi, ref):
     # ref_mol = Chem.MolFromSmiles(ref)
     gen_mol = Chem.MolFromSmiles(smi)
-    src
     if gen_mol:
         try:
             sa_score = sascorer.calculateScore(gen_mol)
@@ -327,12 +326,19 @@ def calSA(smi, ref):
     else:
         return -1.0
 
-# def calLinker_length(sim,ref):
-#     gen_mol = Chem.MolFromSmiles(smi)
-#     ref_mol = Chem.MolFromSmiles(ref)
-#     if gen_mol:
-#         try:
-#             isstandard = juice_is_standard_contains_fregments(gen_mol,)
+def calLinker_length(smi,src):
+    gen_mol = Chem.MolFromSmiles(smi)
+    if gen_mol:
+        try:
+            linker = get_linker(smi,remove_dummys(src))
+            linker_mol = Chem.MolFromSmiles(linker)
+            linker_site_idxs = [atom.GetIdx() for atom in linker_mol.GetAtoms() if atom.GetAtomicNum() == 0]
+            linker_length = len(Chem.rdmolops.GetShortestPath(linker_mol, linker_site_idxs[0], linker_site_idxs[1])) - 2
+            return linker_length
+        except Exception:
+            return -0.5
+    else:
+        return -1.0
 
 def calSIM_3D_seed(smi, ref,seed):
     ref_mol = Chem.MolFromSmiles(ref)
@@ -360,7 +366,7 @@ def calSIM_3D_seed(smi, ref,seed):
 """
 :return one smile's function score
 """
-def calScore(smi, ref, functiontype, clf):
+def calScore(smi, ref, functiontype, clf, src):
     assert functiontype in ['QED', 'MW', 'CLOGP', 'NOS', 'SIM_3D','SIM_3D1','SIM_3D2','linker_length','QED_SA','tanimoto','M_SIM_QED','activity_model']
     if functiontype == 'QED':
         return calQED(smi)
@@ -381,7 +387,7 @@ def calScore(smi, ref, functiontype, clf):
     if functiontype == 'activity_model':
         return calActive(smi, clf)
     if functiontype == 'linker_length':
-        return calSA(smi, ref)    
+        return calLinker_length(smi,src)   
 
 
 """
@@ -705,8 +711,8 @@ def main(opt):
         os.makedirs(f'{opt.output_path}/agent_samples_svg',exist_ok=True)
         os.makedirs(f'{opt.output_path}/agent_samples',exist_ok=True)
 
-        Draw.MolToFile(pred_agent,f'{opt.output_path}/linker_agent_svg/linker_agent_{i}.svg')
-        Draw.MolToFile(pred_prior,f'{opt.output_path}/agent_samples_svg/pred_agent_{i}.svg')
+        Draw.MolToFile(linker_agent_mol,f'{opt.output_path}/linker_agent_svg/linker_agent_{i}.svg')
+        Draw.MolToFile(pred_agent,f'{opt.output_path}/agent_samples_svg/pred_agent_{i}.svg')
         
         cairosvg.svg2png(url=f'{opt.output_path}/linker_agent_svg/linker_agent_{i}.svg', \
                         write_to=f'{opt.output_path}/linker_agent/linker_agent_{i}.png')   
@@ -729,7 +735,7 @@ def main(opt):
 
     for src in src_smi:
         for smi in prior_samples:
-            score = calScore(smi, tgt_smi[0], opt.score_function_type, clf)
+            score = calScore(smi, tgt_smi[0], opt.score_function_type, clf, src)
             # print(score)
             # print(tgt_smi[0])
             # print(smi)
@@ -756,7 +762,7 @@ def main(opt):
         src_new = remove_dummys(src)
         print(f'remove * :{src_new}')
         for smi in agent_samples:
-            score = calScore(smi, tgt_smi[0], opt.score_function_type, clf)
+            score = calScore(smi, tgt_smi[0], opt.score_function_type, clf, src_new)
             # score2 = calc_2D_similarity(smi, tgt_smi[0])
 
             if opt.score_function_type == 'QED_SA':
